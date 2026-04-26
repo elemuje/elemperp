@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, Cell, ReferenceLine,
+  ComposedChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { Activity, Wifi, WifiOff, TrendingUp, TrendingDown } from 'lucide-react';
 
-// Map our pair names to Binance symbols
 const PAIR_TO_BINANCE: Record<string, string> = {
   'SOL-PERP':  'SOLUSDT',
   'BTC-PERP':  'BTCUSDT',
@@ -16,7 +15,7 @@ const PAIR_TO_BINANCE: Record<string, string> = {
 };
 
 interface Candle {
-  time: number;       // Unix ms open time
+  time: number;
   open: number;
   high: number;
   low: number;
@@ -29,7 +28,6 @@ interface Stats {
   high24: number;
   low24: number;
   vol24: number;
-  change24: number;
   changePercent24: number;
 }
 
@@ -55,32 +53,19 @@ function fmtTime(ts: number, tf: TimeFrame) {
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-// Custom candlestick shape for recharts
-const CandlestickBar = (props: any) => {
-  const { x, y, width, height, payload, chartHeight } = props;
-  if (!payload) return null;
-  const { open, close, high, low, isBullish } = payload;
-  const color = isBullish ? '#10b981' : '#ef4444';
-  // We use normalized values from the data domain
-  return null; // handled via SVG overlay
-};
-
-// Pure SVG candlestick chart overlay
-function CandlestickOverlay({
-  candles,
-  width,
-  height,
-  domainMin,
-  domainMax,
-  padding = { left: 8, right: 52, top: 12, bottom: 32 },
-}: {
+// SVG candlestick chart overlay (rendered on top of Recharts axes)
+interface CandlestickOverlayProps {
   candles: Candle[];
   width: number;
   height: number;
   domainMin: number;
   domainMax: number;
   padding: { left: number; right: number; top: number; bottom: number };
-}) {
+}
+
+function CandlestickOverlay({
+  candles, width, height, domainMin, domainMax, padding,
+}: CandlestickOverlayProps) {
   if (!candles.length || domainMax === domainMin) return null;
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
@@ -92,34 +77,20 @@ function CandlestickOverlay({
     padding.top + chartH - ((price - domainMin) / (domainMax - domainMin)) * chartH;
 
   return (
-    <svg
-      style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-      width={width}
-      height={height}
-    >
+    <svg style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} width={width} height={height}>
       {candles.map((c, i) => {
         const cx = padding.left + i * gap + gap / 2;
         const color = c.isBullish ? '#10b981' : '#ef4444';
-        const openY  = toY(c.open);
-        const closeY = toY(c.close);
-        const highY  = toY(c.high);
-        const lowY   = toY(c.low);
+        const openY   = toY(c.open);
+        const closeY  = toY(c.close);
+        const highY   = toY(c.high);
+        const lowY    = toY(c.low);
         const bodyTop    = Math.min(openY, closeY);
         const bodyHeight = Math.max(1, Math.abs(closeY - openY));
-
         return (
           <g key={c.time}>
-            {/* Wick */}
             <line x1={cx} x2={cx} y1={highY} y2={lowY} stroke={color} strokeWidth={1} opacity={0.8} />
-            {/* Body */}
-            <rect
-              x={cx - candleWidth / 2}
-              y={bodyTop}
-              width={candleWidth}
-              height={bodyHeight}
-              fill={color}
-              opacity={0.9}
-            />
+            <rect x={cx - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={color} opacity={0.9} />
           </g>
         );
       })}
@@ -127,10 +98,19 @@ function CandlestickOverlay({
   );
 }
 
-// Custom tooltip
-const ChartTooltip = ({ active, payload, tf }: any) => {
+// Tooltip component — typed explicitly to satisfy strict mode
+interface TooltipPayloadItem {
+  payload?: Candle;
+}
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  tf: TimeFrame;
+}
+
+function ChartTooltip({ active, payload, tf }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload as Candle;
+  const d = payload[0]?.payload;
   if (!d) return null;
   const color = d.isBullish ? '#10b981' : '#ef4444';
   return (
@@ -148,7 +128,7 @@ const ChartTooltip = ({ active, payload, tf }: any) => {
       </div>
     </div>
   );
-};
+}
 
 interface LiveChartProps {
   pair: string;
@@ -167,7 +147,6 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
 
   const symbol = PAIR_TO_BINANCE[pair] ?? 'SOLUSDT';
 
-  // Resize observer
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -179,7 +158,6 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
     return () => ro.disconnect();
   }, []);
 
-  // Fetch historical klines + 24h stats from Binance REST
   const fetchHistory = useCallback(async () => {
     try {
       const [klinesRes, statsRes] = await Promise.all([
@@ -188,7 +166,7 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
       ]);
 
       if (klinesRes.ok) {
-        const raw: any[][] = await klinesRes.json();
+        const raw = await klinesRes.json() as [number, string, string, string, string, string][];
         const parsed: Candle[] = raw.map((k) => {
           const o = parseFloat(k[1]);
           const h = parseFloat(k[2]);
@@ -200,35 +178,31 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
       }
 
       if (statsRes.ok) {
-        const s = await statsRes.json();
+        const s = await statsRes.json() as {
+          lastPrice: string; highPrice: string; lowPrice: string;
+          volume: string; priceChangePercent: string;
+        };
         const price = parseFloat(s.lastPrice);
-        const change = parseFloat(s.priceChange);
-        const pct    = parseFloat(s.priceChangePercent);
         setStats({
           high24: parseFloat(s.highPrice),
           low24:  parseFloat(s.lowPrice),
           vol24:  parseFloat(s.volume),
-          change24: change,
-          changePercent24: pct,
+          changePercent24: parseFloat(s.priceChangePercent),
         });
         onPriceUpdate?.(price);
       }
     } catch {
-      // Binance may be blocked in some regions — fall back gracefully
       setWsStatus('offline');
     }
   }, [symbol, tf, onPriceUpdate]);
 
-  // WebSocket for live candle updates
   useEffect(() => {
-    fetchHistory();
+    void fetchHistory();
 
-    // Close previous socket
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-
     setWsStatus('connecting');
 
     const ws = new WebSocket(
@@ -236,49 +210,46 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
     );
     wsRef.current = ws;
 
-    ws.onopen = () => setWsStatus('live');
+    ws.onopen  = () => setWsStatus('live');
     ws.onerror = () => setWsStatus('offline');
     ws.onclose = () => setWsStatus((s) => (s === 'live' ? 'offline' : s));
 
-    ws.onmessage = (evt) => {
+    ws.onmessage = (evt: MessageEvent<string>) => {
       try {
-        const msg = JSON.parse(evt.data);
-        const streamName: string = msg.stream ?? '';
+        const msg = JSON.parse(evt.data) as { stream: string; data: Record<string, unknown> };
+        const streamName = msg.stream ?? '';
 
         if (streamName.includes('@kline')) {
-          const k = msg.data.k;
-          const o = parseFloat(k.o);
-          const h = parseFloat(k.h);
-          const l = parseFloat(k.l);
-          const c = parseFloat(k.c);
+          const k = msg.data.k as Record<string, string | number>;
+          const o = parseFloat(String(k['o']));
+          const h = parseFloat(String(k['h']));
+          const l = parseFloat(String(k['l']));
+          const c = parseFloat(String(k['c']));
           const newCandle: Candle = {
-            time: k.t,
+            time: Number(k['t']),
             open: o, high: h, low: l, close: c,
-            volume: parseFloat(k.v),
+            volume: parseFloat(String(k['v'])),
             isBullish: c >= o,
           };
           setCandles((prev) => {
             if (!prev.length) return [newCandle];
             const last = prev[prev.length - 1];
-            if (last.time === newCandle.time) {
-              return [...prev.slice(0, -1), newCandle];
-            }
+            if (last?.time === newCandle.time) return [...prev.slice(0, -1), newCandle];
             return [...prev.slice(-99), newCandle];
           });
           onPriceUpdate?.(c);
         }
 
         if (streamName.includes('@ticker')) {
-          const t = msg.data;
+          const t = msg.data as Record<string, string>;
           setStats({
-            high24: parseFloat(t.h),
-            low24:  parseFloat(t.l),
-            vol24:  parseFloat(t.v),
-            change24: parseFloat(t.p),
-            changePercent24: parseFloat(t.P),
+            high24: parseFloat(t['h'] ?? '0'),
+            low24:  parseFloat(t['l'] ?? '0'),
+            vol24:  parseFloat(t['v'] ?? '0'),
+            changePercent24: parseFloat(t['P'] ?? '0'),
           });
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore malformed frames */ }
     };
 
     return () => {
@@ -287,7 +258,6 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
     };
   }, [symbol, tf, fetchHistory]);
 
-  // Price domain
   const visibleCandles = candles.slice(-80);
   const prices = visibleCandles.flatMap((c) => [c.high, c.low]);
   const rawMin = prices.length ? Math.min(...prices) : markPrice * 0.95;
@@ -303,9 +273,8 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header row */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-white/5 flex-shrink-0">
-        {/* Price */}
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-white/5 flex-shrink-0 flex-wrap">
         <div className="flex items-baseline gap-2">
           <span className={`text-xl font-bold font-mono ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
             {fmt(currentPrice, currentPrice < 1 ? 6 : 2)}
@@ -318,7 +287,6 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
           )}
         </div>
 
-        {/* 24h stats */}
         {stats && (
           <div className="hidden sm:flex items-center gap-4 ml-2 text-xs">
             <div>
@@ -336,7 +304,6 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
           </div>
         )}
 
-        {/* Timeframe selector */}
         <div className="ml-auto flex items-center gap-1">
           {(Object.keys(TF_LABEL) as TimeFrame[]).map((t) => (
             <button
@@ -353,8 +320,7 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
           ))}
         </div>
 
-        {/* WS status */}
-        <div className="flex items-center gap-1 ml-2">
+        <div className="flex items-center gap-1">
           {wsStatus === 'live' ? (
             <><Wifi className="w-3 h-3 text-emerald-400" /><span className="text-[10px] text-emerald-400">Live</span></>
           ) : wsStatus === 'connecting' ? (
@@ -376,15 +342,12 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
           </div>
         ) : (
           <>
-            {/* Invisible recharts for axes + grid */}
+            {/* Recharts layer — provides axes, grid, tooltip hitbox */}
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart
-                data={visibleCandles}
-                margin={CHART_PAD}
-              >
+              <ComposedChart data={visibleCandles} margin={CHART_PAD}>
                 <XAxis
                   dataKey="time"
-                  tickFormatter={(t) => fmtTime(t, tf)}
+                  tickFormatter={(t: number) => fmtTime(t, tf)}
                   tick={{ fill: '#475569', fontSize: 9, fontFamily: 'monospace' }}
                   axisLine={false}
                   tickLine={false}
@@ -393,7 +356,7 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
                 <YAxis
                   domain={[domainMin, domainMax]}
                   orientation="right"
-                  tickFormatter={(v) => fmt(v, v < 1 ? 5 : 1)}
+                  tickFormatter={(v: number) => fmt(v, v < 1 ? 5 : 1)}
                   tick={{ fill: '#475569', fontSize: 9, fontFamily: 'monospace' }}
                   axisLine={false}
                   tickLine={false}
@@ -414,19 +377,13 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
                     fontFamily: 'monospace',
                   }}
                 />
-                {/* Volume bars (tiny, bottom) */}
-                <Bar dataKey="volume" yAxisId={1} fill="#22d3ee" opacity={0}>
-                  {visibleCandles.map((c, i) => (
-                    <Cell key={i} fill={c.isBullish ? '#10b98133' : '#ef444433'} />
-                  ))}
-                </Bar>
-                {/* Ghost line so recharts calculates domain */}
-                <Line dataKey="close" dot={false} stroke="transparent" strokeWidth={0} />
+                {/* Invisible line so Recharts computes the Y domain correctly */}
+                <Line dataKey="close" dot={false} stroke="transparent" strokeWidth={0} isAnimationActive={false} />
               </ComposedChart>
             </ResponsiveContainer>
 
             {/* SVG candlestick overlay */}
-            {chartSize.w > 0 && (
+            {chartSize.w > 0 && chartSize.h > 0 && (
               <div className="absolute inset-0 pointer-events-none">
                 <CandlestickOverlay
                   candles={visibleCandles}
@@ -439,20 +396,20 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
               </div>
             )}
 
-            {/* Volume bars overlay at bottom */}
-            {chartSize.w > 0 && chartSize.h > 0 && (
-              <svg
-                style={{ position: 'absolute', bottom: CHART_PAD.bottom, left: CHART_PAD.left, pointerEvents: 'none' }}
-                width={chartSize.w - CHART_PAD.left - CHART_PAD.right}
-                height={40}
-              >
-                {(() => {
-                  const volW = chartSize.w - CHART_PAD.left - CHART_PAD.right;
-                  const maxVol = Math.max(...visibleCandles.map((c) => c.volume));
-                  const gap = volW / visibleCandles.length;
-                  const bw = Math.max(1, gap * 0.7);
-                  return visibleCandles.map((c, i) => {
-                    const bh = maxVol ? (c.volume / maxVol) * 38 : 0;
+            {/* Volume bars overlay */}
+            {chartSize.w > 0 && chartSize.h > 0 && (() => {
+              const volW = chartSize.w - CHART_PAD.left - CHART_PAD.right;
+              const maxVol = Math.max(...visibleCandles.map((c) => c.volume));
+              const gap = volW / visibleCandles.length;
+              const bw = Math.max(1, gap * 0.7);
+              return (
+                <svg
+                  style={{ position: 'absolute', bottom: CHART_PAD.bottom, left: CHART_PAD.left, pointerEvents: 'none' }}
+                  width={volW}
+                  height={40}
+                >
+                  {visibleCandles.map((c, i) => {
+                    const bh = maxVol > 0 ? (c.volume / maxVol) * 38 : 0;
                     return (
                       <rect
                         key={c.time}
@@ -464,14 +421,13 @@ export function LiveChart({ pair, markPrice, onPriceUpdate }: LiveChartProps) {
                         opacity={0.25}
                       />
                     );
-                  });
-                })()}
-              </svg>
-            )}
+                  })}
+                </svg>
+              );
+            })()}
           </>
         )}
 
-        {/* Offline fallback message */}
         {wsStatus === 'offline' && visibleCandles.length > 0 && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-1">
             <span className="text-[10px] text-amber-400">Live feed paused — showing last data</span>

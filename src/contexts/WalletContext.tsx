@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { Connection, clusterApiUrl, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 type NetworkType = 'devnet' | 'mainnet-beta' | 'testnet' | 'unknown';
@@ -71,7 +71,7 @@ async function queryWalletNetwork(provider: any): Promise<NetworkType | null> {
   return null;
 }
 
-export function WalletProvider({ children }: { children: React.ReactNode }) {
+export function WalletProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [publicKey, setPublicKey] = useState<PublicKey | null>(null);

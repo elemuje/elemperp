@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ComponentType } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet, detectInstalledWallets } from '@/contexts/WalletContext';
@@ -37,7 +37,7 @@ const BackpackIcon = () => (
   </svg>
 );
 
-const walletMeta: Record<string, { label: string; icon: React.FC; installUrl: string }> = {
+const walletMeta: Record<string, { label: string; icon: ComponentType; installUrl: string }> = {
   phantom:  { label: 'Phantom',  icon: PhantomIcon,  installUrl: 'https://phantom.app/' },
   solflare: { label: 'Solflare', icon: SolflareIcon, installUrl: 'https://solflare.com/' },
   backpack: { label: 'Backpack', icon: BackpackIcon, installUrl: 'https://www.backpack.exchange/' },

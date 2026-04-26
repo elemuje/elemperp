@@ -107,7 +107,7 @@ export function TradingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateMarkPrice = useCallback((externalPrice?: number) => {
-    if (externalPrice && externalPrice > 0) {
+    if (externalPrice !== undefined && externalPrice > 0) {
       setMarkPrice(Math.round(externalPrice * 100) / 100);
     } else {
       setMarkPrice((prev) => Math.round((prev + (Math.random() - 0.5) * 1.2) * 100) / 100);
