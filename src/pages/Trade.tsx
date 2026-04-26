@@ -4,6 +4,7 @@ import { useWallet } from '@/contexts/WalletContext';
 import { useTrading } from '@/contexts/TradingContext';
 import { useToast } from '@/contexts/ToastContext';
 import { LiveChart } from '@/components/LiveChart';
+import { PortfolioPanel } from '@/components/PortfolioPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -46,7 +47,7 @@ export function TradePage() {
 
   const handlePriceUpdate = useCallback((price: number) => {
     setLivePrice(price);
-    updateMarkPrice();           // keep TradingContext in sync
+    updateMarkPrice(price);  // sync real price into TradingContext
   }, [updateMarkPrice]);
 
   const handleSubmit = async () => {
@@ -470,6 +471,13 @@ export function TradePage() {
               <Shield className="w-3 h-3 text-cyan-400" />
               <span className="text-[10px] text-cyan-400">MEV-resistant via Arcium MPC</span>
             </div>
+          </div>
+        </div>
+
+        {/* u2500u2500 Portfolio Panel u2500u2500 */}
+        <div className="lg:col-span-12 xl:col-span-2 order-first xl:order-last">
+          <div className="sticky top-22 space-y-4">
+            <PortfolioPanel />
           </div>
         </div>
 

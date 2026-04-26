@@ -128,3 +128,16 @@
     background-size: 50px 50px;
   }
 }
+
+  /* Market ticker scroll */
+  @keyframes ticker {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .animate-ticker {
+    animation: ticker 35s linear infinite;
+    width: max-content;
+  }
+  .animate-ticker:hover {
+    animation-play-state: paused;
+  }
