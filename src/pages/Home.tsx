@@ -83,7 +83,7 @@ export function HomePage() {
                   </Button>
                 </Link>
               ) : (
-                <Button size="lg" onClick={connect} className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold h-12 px-8">
+                <Button size="lg" onClick={() => connect()} className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold h-12 px-8">
                   <Wallet className="w-4 h-4 mr-2" />
                   Connect Wallet
                 </Button>
