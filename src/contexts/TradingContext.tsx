@@ -19,7 +19,7 @@ interface TradingContextType {
     takeProfit?: number;
   }) => Promise<void>;
   closePosition: (id: string, percent?: number) => Promise<void>;
-  updateMarkPrice: () => void;
+  updateMarkPrice: (externalPrice?: number) => void;
   refreshBalance: () => void;
 }
 
@@ -106,8 +106,12 @@ export function TradingProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const updateMarkPrice = useCallback(() => {
-    setMarkPrice((prev) => Math.round((prev + (Math.random() - 0.5) * 1.2) * 100) / 100);
+  const updateMarkPrice = useCallback((externalPrice?: number) => {
+    if (externalPrice && externalPrice > 0) {
+      setMarkPrice(Math.round(externalPrice * 100) / 100);
+    } else {
+      setMarkPrice((prev) => Math.round((prev + (Math.random() - 0.5) * 1.2) * 100) / 100);
+    }
   }, []);
 
   const simulateArciumFlow = useCallback(async (): Promise<void> => {

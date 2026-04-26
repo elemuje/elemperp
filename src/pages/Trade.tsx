@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useWallet } from '@/contexts/WalletContext';
 import { useTrading } from '@/contexts/TradingContext';
 import { useToast } from '@/contexts/ToastContext';
+import { LiveChart } from '@/components/LiveChart';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -10,37 +11,43 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  TrendingUp,
-  TrendingDown,
-  Lock,
-  Eye,
-  Wallet,
-  X,
-  Clock,
-  Shield,
-  Activity,
+  TrendingUp, TrendingDown, Lock, Eye, Wallet,
+  X, Clock, Shield, Activity,
 } from 'lucide-react';
 
 export function TradePage() {
   const { connected, publicKey } = useWallet();
-  const { orderBook, markPrice, positions, tradeHistory, openPosition, closePosition, isExecuting, walletBalance } = useTrading();
+  const {
+    orderBook, markPrice, positions, tradeHistory,
+    openPosition, closePosition, isExecuting, walletBalance,
+    updateMarkPrice,
+  } = useTrading();
   const { addToast } = useToast();
 
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
-  const [side, setSide] = useState<'long' | 'short'>('long');
-  const [size, setSize] = useState('100');
-  const [leverage, setLeverage] = useState([10]);
-  const [limitPrice, setLimitPrice] = useState(markPrice.toFixed(2));
-  const [stopLoss, setStopLoss] = useState('');
-  const [takeProfit, setTakeProfit] = useState('');
+  const [orderType, setOrderType]     = useState<'market' | 'limit'>('market');
+  const [side, setSide]               = useState<'long' | 'short'>('long');
+  const [size, setSize]               = useState('100');
+  const [leverage, setLeverage]       = useState([10]);
+  const [limitPrice, setLimitPrice]   = useState(markPrice.toFixed(2));
+  const [stopLoss, setStopLoss]       = useState('');
+  const [takeProfit, setTakeProfit]   = useState('');
   const [selectedPair, setSelectedPair] = useState('SOL-PERP');
   const [privacyMode, setPrivacyMode] = useState(true);
-  const [activeTab, setActiveTab] = useState('positions');
-  const [partialClosePercent] = useState(100);
+  const [activeTab, setActiveTab]     = useState('positions');
+  const [livePrice, setLivePrice]     = useState<number | null>(null);
+  const [partialClosePercent]         = useState(100);
 
   const pairs = ['SOL-PERP', 'BTC-PERP', 'ETH-PERP', 'JTO-PERP', 'JUP-PERP', 'BONK-PERP'];
+
+  // Use live Binance price if available, otherwise fall back to simulated
+  const displayPrice = livePrice ?? markPrice;
   const margin = parseFloat(size || '0') / leverage[0];
-  const fee = parseFloat(size || '0') * 0.0008;
+  const fee    = parseFloat(size || '0') * 0.0008;
+
+  const handlePriceUpdate = useCallback((price: number) => {
+    setLivePrice(price);
+    updateMarkPrice();           // keep TradingContext in sync
+  }, [updateMarkPrice]);
 
   const handleSubmit = async () => {
     if (!connected || !publicKey) {
@@ -54,10 +61,14 @@ export function TradePage() {
         size: parseFloat(size),
         leverage: leverage[0],
         orderType,
-        stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
-        takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+        stopLoss:    stopLoss    ? parseFloat(stopLoss)    : undefined,
+        takeProfit:  takeProfit  ? parseFloat(takeProfit)  : undefined,
       });
-      addToast({ type: 'success', title: 'Position opened', message: `${side.toUpperCase()} ${size} ${selectedPair} at ${leverage[0]}x leverage` });
+      addToast({
+        type: 'success',
+        title: 'Position opened',
+        message: `${side.toUpperCase()} ${size} ${selectedPair} @ ${leverage[0]}x`,
+      });
     } catch {
       addToast({ type: 'error', title: 'Trade failed', message: 'Transaction was rejected or failed' });
     }
@@ -66,7 +77,7 @@ export function TradePage() {
   const handleClose = async (id: string) => {
     try {
       await closePosition(id, partialClosePercent);
-      addToast({ type: 'success', title: 'Position closed', message: `${partialClosePercent}% of position closed successfully` });
+      addToast({ type: 'success', title: 'Position closed', message: `${partialClosePercent}% of position closed` });
     } catch {
       addToast({ type: 'error', title: 'Close failed', message: 'Unable to close position' });
     }
@@ -95,8 +106,10 @@ export function TradePage() {
   return (
     <div className="min-h-screen bg-[#0a0e1a] pt-14">
       <div className="max-w-[1440px] mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Left: Order Book + Chart */}
+
+        {/* ── Left: Pair Selector + Order Book ── */}
         <div className="lg:col-span-3 flex flex-col gap-4">
+
           {/* Pair selector */}
           <div className="bg-[#131722] rounded-lg border border-white/5 p-3">
             <select
@@ -109,8 +122,12 @@ export function TradePage() {
               ))}
             </select>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-bold text-white">{markPrice.toFixed(2)}</span>
-              <span className="text-xs text-emerald-400">+1.24%</span>
+              <span className="text-2xl font-bold text-white font-mono">
+                {displayPrice.toFixed(displayPrice < 1 ? 5 : 2)}
+              </span>
+              <span className={`text-xs ${livePrice ? 'text-emerald-400' : 'text-slate-500'}`}>
+                {livePrice ? '● Live' : '○ Simulated'}
+              </span>
             </div>
           </div>
 
@@ -118,9 +135,7 @@ export function TradePage() {
           <div className="bg-[#131722] rounded-lg border border-white/5 flex-1 min-h-[400px]">
             <div className="flex items-center justify-between p-3 border-b border-white/5">
               <span className="text-xs font-semibold text-slate-400">Order Book</span>
-              <div className="flex gap-1">
-                <span className="text-[10px] text-slate-500">Spread: 0.05</span>
-              </div>
+              <span className="text-[10px] text-slate-500">Spread: 0.05</span>
             </div>
             <div className="grid grid-cols-3 gap-1 px-3 py-2 text-[10px] text-slate-500 uppercase">
               <span>Price</span>
@@ -138,7 +153,7 @@ export function TradePage() {
                   </div>
                 ))}
                 <div className="py-2 text-center">
-                  <span className="text-xs font-bold text-white">{markPrice.toFixed(2)}</span>
+                  <span className="text-xs font-bold text-white font-mono">{displayPrice.toFixed(2)}</span>
                 </div>
                 {orderBook.bids.map((bid, i) => (
                   <div key={`bid-${i}`} className="grid grid-cols-3 gap-1 px-2 py-0.5 text-[11px] relative group cursor-pointer hover:bg-white/5">
@@ -153,39 +168,30 @@ export function TradePage() {
           </div>
         </div>
 
-        {/* Center: Chart Placeholder */}
+        {/* ── Center: Live Chart + Positions ── */}
         <div className="lg:col-span-6 flex flex-col gap-4">
-          <div className="bg-[#131722] rounded-lg border border-white/5 h-[400px] lg:h-[520px] flex flex-col">
-            <div className="flex items-center gap-4 p-3 border-b border-white/5">
+
+          {/* Chart */}
+          <div className="bg-[#131722] rounded-lg border border-white/5 h-[420px] lg:h-[540px] flex flex-col overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/5 flex-shrink-0">
               <span className="text-sm font-semibold text-white">{selectedPair}</span>
               <Badge variant="outline" className="text-[10px] border-cyan-500/30 text-cyan-400">PERPETUAL</Badge>
-              <div className="ml-auto flex items-center gap-2">
-                <button className={`p-1 rounded ${privacyMode ? 'text-cyan-400' : 'text-slate-500'}`} onClick={() => setPrivacyMode(!privacyMode)}>
+              <div className="ml-auto">
+                <button
+                  className={`p-1 rounded transition-colors ${privacyMode ? 'text-cyan-400' : 'text-slate-500 hover:text-white'}`}
+                  onClick={() => setPrivacyMode(!privacyMode)}
+                  title={privacyMode ? 'Privacy On' : 'Privacy Off'}
+                >
                   {privacyMode ? <Lock className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </div>
             </div>
-            <div className="flex-1 flex items-center justify-center bg-grid relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-t from-[#131722] via-transparent to-transparent" />
-              <div className="text-center relative z-10">
-                <Activity className="w-12 h-12 text-cyan-500/30 mx-auto mb-3" />
-                <p className="text-slate-500 text-sm">Live Price Chart</p>
-                <p className="text-slate-600 text-xs mt-1">{markPrice.toFixed(2)} USDC</p>
-                <div className="mt-6 flex items-center justify-center gap-6">
-                  <div className="text-center">
-                    <p className="text-[10px] text-slate-500 uppercase">24h High</p>
-                    <p className="text-sm font-mono text-white">{(markPrice * 1.05).toFixed(2)}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] text-slate-500 uppercase">24h Low</p>
-                    <p className="text-sm font-mono text-white">{(markPrice * 0.97).toFixed(2)}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] text-slate-500 uppercase">24h Vol</p>
-                    <p className="text-sm font-mono text-white">{(Math.random() * 2 + 1).toFixed(2)}M</p>
-                  </div>
-                </div>
-              </div>
+            <div className="flex-1 min-h-0">
+              <LiveChart
+                pair={selectedPair}
+                markPrice={markPrice}
+                onPriceUpdate={handlePriceUpdate}
+              />
             </div>
           </div>
 
@@ -223,14 +229,10 @@ export function TradePage() {
                         <span className="col-span-2">Entry</span>
                         <span className="col-span-2">Mark</span>
                         <span className="col-span-2">PnL</span>
-                        <span className="col-span-1"></span>
+                        <span className="col-span-1" />
                       </div>
                       {positions.filter((p) => p.status === 'open').map((pos) => (
-                        <motion.div
-                          key={pos.id}
-                          layout
-                          className="grid grid-cols-12 gap-2 items-center px-2 py-2.5 rounded-md bg-white/[0.02] border border-white/5"
-                        >
+                        <motion.div key={pos.id} layout className="grid grid-cols-12 gap-2 items-center px-2 py-2.5 rounded-md bg-white/[0.02] border border-white/5">
                           <span className="col-span-2 text-xs font-medium text-white">{pos.pair}</span>
                           <Badge className={`col-span-1 w-fit text-[10px] ${pos.side === 'long' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20' : 'bg-red-500/15 text-red-400 border-red-500/20'}`}>
                             {pos.side.toUpperCase()}
@@ -243,8 +245,7 @@ export function TradePage() {
                           </span>
                           <div className="col-span-1 flex justify-end">
                             <Button
-                              size="sm"
-                              variant="ghost"
+                              size="sm" variant="ghost"
                               className="h-6 px-2 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
                               onClick={() => handleClose(pos.id)}
                               disabled={isExecuting}
@@ -255,7 +256,7 @@ export function TradePage() {
                           <div className="col-span-12 flex items-center gap-3 mt-1">
                             <span className="text-[10px] text-slate-500">Liq: <span className="font-mono text-slate-400">{pos.liquidationPrice.toFixed(2)}</span></span>
                             <span className="text-[10px] text-slate-500">Lev: <span className="font-mono text-slate-400">{pos.leverage}x</span></span>
-                            {pos.stopLoss && <span className="text-[10px] text-slate-500">SL: <span className="font-mono text-red-400">{pos.stopLoss}</span></span>}
+                            {pos.stopLoss   && <span className="text-[10px] text-slate-500">SL: <span className="font-mono text-red-400">{pos.stopLoss}</span></span>}
                             {pos.takeProfit && <span className="text-[10px] text-slate-500">TP: <span className="font-mono text-emerald-400">{pos.takeProfit}</span></span>}
                           </div>
                         </motion.div>
@@ -288,23 +289,34 @@ export function TradePage() {
                           <Badge className={`col-span-1 w-fit text-[10px] ${trade.side === 'long' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
                             {trade.side.toUpperCase()}
                           </Badge>
-                          <span className="col-span-2 text-xs font-mono text-slate-400">{trade.entryPrice.toFixed(2)} → {trade.exitPrice?.toFixed(2)}</span>
+                          <span className="col-span-2 text-xs font-mono text-slate-400">
+                            {trade.entryPrice.toFixed(2)} → {trade.exitPrice?.toFixed(2)}
+                          </span>
                           <span className={`col-span-2 text-xs font-mono font-semibold ${(trade.realizedPnl || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                             {(trade.realizedPnl || 0) >= 0 ? '+' : ''}{(trade.realizedPnl || 0).toFixed(2)} ({trade.pnlPercent}%)
                           </span>
                           <span className="col-span-2 text-xs font-mono text-slate-400">{trade.size} USDC</span>
-                          <span className="col-span-3 text-[10px] font-mono text-slate-500">{new Date(trade.closeTimestamp || trade.timestamp).toLocaleString()}</span>
+                          <span className="col-span-3 text-[10px] font-mono text-slate-500">
+                            {new Date(trade.closeTimestamp || trade.timestamp).toLocaleString()}
+                          </span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
               )}
+
+              {activeTab === 'orders' && (
+                <div className="text-center py-8">
+                  <Activity className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">No open orders</p>
+                </div>
+              )}
             </Tabs>
           </div>
         </div>
 
-        {/* Right: Trading Panel */}
+        {/* ── Right: Order Panel ── */}
         <div className="lg:col-span-3">
           <div className="bg-[#131722] rounded-lg border border-white/5 p-4 sticky top-16">
             <div className="flex items-center justify-between mb-4">
@@ -318,28 +330,24 @@ export function TradePage() {
             <Tabs value={orderType} onValueChange={(v) => setOrderType(v as 'market' | 'limit')} className="mb-4">
               <TabsList className="w-full grid grid-cols-2 bg-[#1a1f2e]">
                 <TabsTrigger value="market" className="text-xs data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-400">Market</TabsTrigger>
-                <TabsTrigger value="limit" className="text-xs data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-400">Limit</TabsTrigger>
+                <TabsTrigger value="limit"  className="text-xs data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-400">Limit</TabsTrigger>
               </TabsList>
             </Tabs>
 
             <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setSide('long')}
+              <button onClick={() => setSide('long')}
                 className={`flex-1 py-2 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                   side === 'long' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-[#1a1f2e] text-slate-400 border border-transparent'
                 }`}
               >
-                <TrendingUp className="w-3.5 h-3.5" />
-                Long
+                <TrendingUp className="w-3.5 h-3.5" /> Long
               </button>
-              <button
-                onClick={() => setSide('short')}
+              <button onClick={() => setSide('short')}
                 className={`flex-1 py-2 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                   side === 'short' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-[#1a1f2e] text-slate-400 border border-transparent'
                 }`}
               >
-                <TrendingDown className="w-3.5 h-3.5" />
-                Short
+                <TrendingDown className="w-3.5 h-3.5" /> Short
               </button>
             </div>
 
@@ -360,17 +368,28 @@ export function TradePage() {
             <div className="mb-3">
               <div className="flex items-center justify-between mb-1">
                 <label className="text-[10px] text-slate-500 uppercase">Size</label>
-                <span className="text-[10px] text-slate-500">Available: <span className="font-mono text-white">{walletBalance.usdc.toFixed(1)}</span> USDC</span>
+                <span className="text-[10px] text-slate-500">Avail: <span className="font-mono text-white">{walletBalance.usdc.toFixed(1)}</span> USDC</span>
               </div>
               <div className="relative">
                 <Input
                   value={size}
                   onChange={(e) => setSize(e.target.value)}
-                  type="number"
-                  min="1"
+                  type="number" min="1"
                   className="bg-[#1a1f2e] border-white/5 text-white text-sm font-mono pr-12"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">USDC</span>
+              </div>
+              {/* Quick size buttons */}
+              <div className="flex gap-1 mt-1.5">
+                {[25, 50, 75, 100].map((pct) => (
+                  <button
+                    key={pct}
+                    onClick={() => setSize(((walletBalance.usdc * pct) / 100).toFixed(0))}
+                    className="flex-1 text-[10px] py-1 rounded bg-white/5 hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-400 transition-colors"
+                  >
+                    {pct}%
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -379,14 +398,7 @@ export function TradePage() {
                 <label className="text-[10px] text-slate-500 uppercase">Leverage</label>
                 <span className="text-xs font-mono text-cyan-400">{leverage[0]}x</span>
               </div>
-              <Slider
-                value={leverage}
-                onValueChange={setLeverage}
-                min={1}
-                max={50}
-                step={1}
-                className="py-2"
-              />
+              <Slider value={leverage} onValueChange={setLeverage} min={1} max={50} step={1} className="py-2" />
               <div className="flex justify-between mt-1">
                 {[1, 5, 10, 25, 50].map((l) => (
                   <button key={l} onClick={() => setLeverage([l])} className="text-[10px] text-slate-500 hover:text-cyan-400 transition-colors">
@@ -399,23 +411,13 @@ export function TradePage() {
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div>
                 <label className="text-[10px] text-slate-500 uppercase mb-1 block">Stop Loss</label>
-                <Input
-                  value={stopLoss}
-                  onChange={(e) => setStopLoss(e.target.value)}
-                  type="number"
-                  placeholder="0.00"
-                  className="bg-[#1a1f2e] border-white/5 text-white text-xs font-mono"
-                />
+                <Input value={stopLoss} onChange={(e) => setStopLoss(e.target.value)} type="number" placeholder="0.00"
+                  className="bg-[#1a1f2e] border-white/5 text-white text-xs font-mono" />
               </div>
               <div>
                 <label className="text-[10px] text-slate-500 uppercase mb-1 block">Take Profit</label>
-                <Input
-                  value={takeProfit}
-                  onChange={(e) => setTakeProfit(e.target.value)}
-                  type="number"
-                  placeholder="0.00"
-                  className="bg-[#1a1f2e] border-white/5 text-white text-xs font-mono"
-                />
+                <Input value={takeProfit} onChange={(e) => setTakeProfit(e.target.value)} type="number" placeholder="0.00"
+                  className="bg-[#1a1f2e] border-white/5 text-white text-xs font-mono" />
               </div>
             </div>
 
@@ -432,9 +434,13 @@ export function TradePage() {
                 <span className="text-slate-500">Est. Liq. Price</span>
                 <span className="font-mono text-red-400">
                   {side === 'long'
-                    ? (markPrice * (1 - 0.9 / leverage[0])).toFixed(2)
-                    : (markPrice * (1 + 0.9 / leverage[0])).toFixed(2)}
+                    ? (displayPrice * (1 - 0.9 / leverage[0])).toFixed(2)
+                    : (displayPrice * (1 + 0.9 / leverage[0])).toFixed(2)}
                 </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Notional Value</span>
+                <span className="font-mono text-white">{(parseFloat(size || '0')).toFixed(2)} USDC</span>
               </div>
             </div>
 
@@ -450,7 +456,7 @@ export function TradePage() {
               {isExecuting ? (
                 <span className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                  Processing...
+                  Processing via Arcium…
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
@@ -466,6 +472,7 @@ export function TradePage() {
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );
