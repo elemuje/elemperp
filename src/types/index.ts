@@ -17,6 +17,8 @@ export interface Trade {
   orderType: 'market' | 'limit';
   stopLoss?: number;
   takeProfit?: number;
+  arciumTxHash?: string;
+  arciumComputationAccount?: string;
 }
 
 export interface TradeHistoryItem extends Trade {
