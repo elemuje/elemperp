@@ -64,10 +64,10 @@
     "tailwind-merge": "^3.4.0",
     "vaul": "^1.1.2",
     "zod": "^4.3.5",
-    "@arcium-hq/client": "^0.9.7",
-    "@coral-xyz/anchor": "0.32.1",
     "bn.js": "^5.2.1",
-    "buffer": "^6.0.3"
+    "buffer": "^6.0.3",
+    "@noble/curves": "^1.9.5",
+    "@noble/hashes": "^1.7.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -85,7 +85,6 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4",
-    "vite-plugin-node-polyfills": "^0.26.0"
+    "vite": "^7.2.4"
   }
 }
