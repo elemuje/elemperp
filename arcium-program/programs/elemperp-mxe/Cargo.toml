@@ -1,0 +1,19 @@
+[package]
+name    = "elemperp-mxe"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name       = "elemperp_mxe"
+
+[features]
+no-entrypoint = []
+no-idl        = []
+cpi           = ["no-entrypoint"]
+default       = []
+
+[dependencies]
+anchor-lang   = { workspace = true }
+arcium-anchor = { workspace = true }
+arcis         = { workspace = true }

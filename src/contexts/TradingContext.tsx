@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { prepareArciumTrade, explorerLink, shortKey } from '@/lib/arcium';
+import { prepareArciumTrade, awaitAndDecryptResult, explorerTxLink, shortKey } from '@/lib/arcium';
 import { Connection, clusterApiUrl } from '@solana/web3.js';
 import type { Trade, TradeHistoryItem, OrderBookEntry, ArciumStep, WalletBalance } from '@/types';
 
@@ -144,6 +144,7 @@ export function TradingProvider({ children }: { children: React.ReactNode }) {
       side:       params.side,
       stopLoss:   params.stopLoss,
       takeProfit: params.takeProfit,
+      markPrice:  markPrice,
     });
 
     // Log the encrypted payload for transparency / verification
@@ -163,25 +164,30 @@ export function TradingProvider({ children }: { children: React.ReactNode }) {
     await new Promise((r) => setTimeout(r, 600));
     stepDone(2);
 
-    // Step 4: MPC finalization (full finalization requires backend relay with @coral-xyz/anchor)
-    await new Promise((r) => setTimeout(r, 500));
+    // Step 4: Await MPC finalization and decrypt result
+    await new Promise((r) => setTimeout(r, 400));
     stepDone(3);
 
-    // Step 5: Settlement — computation account is derived and verifiable on-chain
-    await new Promise((r) => setTimeout(r, 400));
+    // Poll computation account until finalized, then decrypt callback output
+    const result = await awaitAndDecryptResult(connection, payload, 90_000);
+
+    // Step 5: Settlement
     stepDone(4);
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 200));
     setArciumSteps((prev) => prev.map((s) => ({ ...s, status: 'completed' })));
     setIsExecuting(false);
 
-    // Use the real computation offset as the display hash
-    const txHash = payload.computationOffset.toString(16).padStart(64, '0');
-    const computationAccount = payload.pdas.computationAccount.toBase58();
+    const txHash = result.finalizationTx ||
+      payload.computationOffset.toString(16).padStart(64, '0');
+    const computationAccount = result.computationAccount;
 
-    console.info('[Arcium] Computation account PDA:', computationAccount);
-    console.info('[Arcium] Explorer:', explorerLink(''));
-    console.info('[Arcium] Encrypted size (first block):', payload.encryptedSize[0]);
-    console.info('[Arcium] Client pubkey:', Buffer.from(payload.clientPublicKey).toString('hex'));
+    if (result.finalizationTx) {
+      console.info('[Arcium] ✓ Finalization tx:', explorerTxLink(result.finalizationTx));
+    }
+    console.info('[Arcium]   Margin:    $' + result.margin.toFixed(2));
+    console.info('[Arcium]   Fee:       $' + result.fee.toFixed(4));
+    console.info('[Arcium]   Liq Long:  $' + result.liqPriceLong.toFixed(2));
+    console.info('[Arcium]   Liq Short: $' + result.liqPriceShort.toFixed(2));
 
     return { txHash, computationAccount };
   }, []);

@@ -1,0 +1,26 @@
+{
+  "name": "elemperp-mxe",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test":   "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts",
+    "build":  "anchor build",
+    "deploy": "anchor deploy --provider.cluster devnet"
+  },
+  "dependencies": {
+    "@arcium-hq/client": "^0.9.7",
+    "@coral-xyz/anchor": "0.32.1",
+    "@solana/web3.js":   "^1.98.4",
+    "bn.js":             "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/bn.js":       "^5.1.6",
+    "@types/chai":        "^4.3.20",
+    "@types/mocha":       "^10.0.10",
+    "@types/node":        "^22.0.0",
+    "chai":               "^4.5.0",
+    "mocha":              "^10.8.2",
+    "ts-mocha":           "^10.0.0",
+    "typescript":         "^5.9.3"
+  }
+}
