@@ -7,8 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "postinstall": "node scripts/patch-arcium.cjs"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -68,9 +67,7 @@
     "bn.js": "^5.2.1",
     "buffer": "^6.0.3",
     "@noble/curves": "^1.9.5",
-    "@noble/hashes": "^1.7.1",
-    "@arcium-hq/client": "^0.9.7",
-    "@coral-xyz/anchor": "0.32.1"
+    "@noble/hashes": "^1.7.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
