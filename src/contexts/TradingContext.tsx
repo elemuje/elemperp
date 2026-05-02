@@ -150,7 +150,7 @@ export function TradingProvider({ children }: { children: React.ReactNode }) {
     // Log the encrypted payload for transparency / verification
     console.info('[Arcium] Trade encrypted:', {
       computationOffset: payload.computationOffset.toString(),
-      clientPublicKey:   Buffer.from(payload.clientPublicKey).toString('hex'),
+      clientPublicKey:   Array.from(payload.clientPublicKey).map(b => b.toString(16).padStart(2,'0')).join(''),
       encryptedSize:     payload.encryptedSize,
     });
 
