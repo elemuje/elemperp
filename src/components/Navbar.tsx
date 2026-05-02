@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import React, { useState, type ComponentType } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet, detectInstalledWallets } from '@/contexts/WalletContext';
@@ -68,7 +68,7 @@ function WalletPickerModal({ onClose }: { onClose: () => void }) {
         exit={{ scale: 0.92, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
         className="bg-[#0f1219] border border-white/10 rounded-xl p-5 w-full max-w-xs shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-white">Connect Wallet</h3>

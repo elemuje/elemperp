@@ -18,42 +18,6 @@ import {
   SYSVAR_CLOCK_PUBKEY,
 } from '@solana/web3.js';
 
-// bn.js ships without types — declare the module here to satisfy TS
-declare module 'bn.js' {
-  class BN {
-    constructor(number: number | string | Uint8Array | BN, base?: number | 'hex', endian?: 'le' | 'be');
-    static isBN(b: unknown): b is BN;
-    toArrayLike(type: Uint8ArrayConstructor, endian: 'le' | 'be', length: number): Uint8Array;
-    toArrayLike(type: typeof Array, endian: 'le' | 'be', length?: number): number[];
-    toString(base?: number | 'hex'): string;
-    toNumber(): number;
-    add(b: BN): BN;
-    sub(b: BN): BN;
-    mul(b: BN): BN;
-    div(b: BN): BN;
-    mod(b: BN): BN;
-    eq(b: BN): boolean;
-    lt(b: BN): boolean;
-    gt(b: BN): boolean;
-    isZero(): boolean;
-    isNeg(): boolean;
-    abs(): BN;
-    neg(): BN;
-    clone(): BN;
-    notn(w: number): BN;
-    shrn(b: number): BN;
-    shln(b: number): BN;
-    and(b: BN): BN;
-    or(b: BN): BN;
-    xor(b: BN): BN;
-    testn(b: number): boolean;
-    bitLength(): number;
-    byteLength(): number;
-    toBuffer(endian?: 'le' | 'be', length?: number): Uint8Array;
-  }
-  export = BN;
-}
-
 import BN from 'bn.js';
 
 // ── Arcium on-chain constants ──────────────────────────────────────────────
@@ -444,7 +408,8 @@ export function buildTradeInstruction(
 
   return new TransactionInstruction({
     programId: mxeProg,
-    data,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: data as any,
     keys: [
       { pubkey: payer,                    isSigner: true,  isWritable: true  },
       { pubkey: pdas.mxeAccount,          isSigner: false, isWritable: false },
